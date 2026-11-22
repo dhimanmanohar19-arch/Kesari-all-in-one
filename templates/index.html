@@ -1,1 +1,183 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All-in-One Kesari</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #f4f6fb;
+      color: #1e293b;
+      padding: 16px;
+    }
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.5rem;
+      color: #0f172a;
+    }
+    .subtitle {
+      margin: 0 0 18px;
+      font-size: 0.92rem;
+      color: #64748b;
+    }
+    .chat-box {
+      min-height: 240px;
+      max-height: 420px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      background: #f8fafc;
+      margin-bottom: 14px;
+    }
+    .msg {
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .user-msg {
+      background: #dbeafe;
+      color: #1e3a8a;
+      margin-left: 12%;
+    }
+    .bot-msg {
+      background: #e2e8f0;
+      color: #0f172a;
+      margin-right: 12%;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 1rem;
+    }
+    button {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: #ffffff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #0f766e;
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>All-in-One Kesari</h1>
+    <p class="subtitle">अपना सवाल या जानकारी यहाँ लिखें और जवाब पाएं।</p>
 
+    <div id="chatBox" class="chat-box">
+      <div class="msg bot-msg">नमस्ते! All-in-One Kesari तैयार है। आप क्या पूछना या देखना चाहते हैं?</div>
+    </div>
+
+    <div class="controls">
+      <input id="promptInput" type="text" placeholder="यहाँ लिखें..." autocomplete="off" />
+      <button id="sendBtn" type="button">भेजें</button>
+      <button id="speakBtn" class="secondary" type="button">सुनाएं</button>
+    </div>
+
+    <div id="statusText" class="status">तैयार</div>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById("chatBox");
+    const promptInput = document.getElementById("promptInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const speakBtn = document.getElementById("speakBtn");
+    const statusText = document.getElementById("statusText");
+
+    let lastReply = "नमस्ते! All-in-One Kesari तैयार है।";
+
+    function appendMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = `msg ${sender === "user" ? "user-msg" : "bot-msg"}`;
+      div.textContent = text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const message = promptInput.value.trim();
+      if (!message) return;
+
+      appendMessage(message, "user");
+      promptInput.value = "";
+      sendBtn.disabled = true;
+      statusText.textContent = "जवाब लाया जा रहा है...";
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message })
+        });
+
+        const data = await res.json();
+        const reply = data.reply || data.response || data.answer || "कोई जवाब नहीं मिला।";
+        lastReply = reply;
+        appendMessage(reply, "bot");
+        statusText.textContent = "तैयार";
+      } catch (err) {
+        const errMsg = "कनेक्शन में समस्या आई है। कृपया app.py का route और सर्वर जांचें।";
+        lastReply = errMsg;
+        appendMessage(errMsg, "bot");
+        statusText.textContent = "एरर";
+      } finally {
+        sendBtn.disabled = false;
+        promptInput.focus();
+      }
+    }
+
+    function speakText() {
+      if (!("speechSynthesis" in window)) {
+        statusText.textContent = "इस ब्राउज़र में बोलकर सुनाने की सुविधा उपलब्ध नहीं है।";
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(lastReply);
+      utterance.lang = "hi-IN";
+      window.speechSynthesis.speak(utterance);
+      statusText.textContent = "जवाब सुनाया जा रहा है...";
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    promptInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+    speakBtn.addEventListener("click", speakText);
+  </script>
+</body>
+</html>
