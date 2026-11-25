@@ -1,1 +1,268 @@
+HTML
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXA A2A AI</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #10131c;
+  color: white;
+}
+
+.app {
+  max-width: 650px;
+  margin: auto;
+  padding: 15px;
+}
+
+header {
+  text-align: center;
+  padding: 20px;
+  background: #1c2435;
+  border-radius: 15px;
+}
+
+header h1 {
+  color: #35c8ff;
+  margin: 5px;
+}
+
+#statusText {
+  color: #55e6a5;
+  font-size: 13px;
+}
+
+.chat-box {
+  height: 60vh;
+  min-height: 300px;
+  overflow-y: auto;
+  background: #171e2c;
+  border-radius: 15px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.msg {
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.user {
+  background: #164e72;
+  text-align: right;
+}
+
+.bot {
+  background: #293448;
+  text-align: left;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.input-box {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 15px;
+  background: #078bd0;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: .5;
+}
+
+.mic-button {
+  background: #159b69;
+}
+
+footer {
+  text-align: center;
+  color: #aaa;
+  padding: 20px;
+  font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<header>
+  <h1>NEXA A2A AI</h1>
+  <p>आपका अपना AI Assistant</p>
+  <div id="statusText">ऑनलाइन होने की तैयारी...</div>
+</header>
+
+<div id="chatBox" class="chat-box">
+  <div class="msg bot">
+    नमस्ते! NEXA A2A AI में आपका स्वागत है।
+    आप अपना सवाल लिखें या माइक से बोलें।
+  </div>
+</div>
+
+<div class="controls">
+  <input
+    id="userInput"
+    class="input-box"
+    type="text"
+    placeholder="अपना सवाल लिखिए..."
+  >
+
+  <button id="micBtn" class="mic-button"
+    type="button" title="माइक">
+    🎤
+  </button>
+
+  <button id="sendBtn" type="button">
+    भेजें
+  </button>
+</div>
+
+<footer>
+  NEXA A2A AI | Powered by AI
+</footer>
+
+</div>
+
+<script>
+const chatBox = document.getElementById("chatBox");
+const input = document.getElementById("userInput");
+const sendBtn = document.getElementById("sendBtn");
+const micBtn = document.getElementById("micBtn");
+const statusText = document.getElementById("statusText");
+
+function addMessage(text, sender = "bot") {
+  const div = document.createElement("div");
+  div.className = "msg " + sender;
+  div.textContent = text;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function speakText(text) {
+  if (!("speechSynthesis" in window)) return;
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "hi-IN";
+  window.speechSynthesis.speak(utterance);
+}
+
+async function sendMessage() {
+  const message = input.value.trim();
+
+  if (!message) return;
+
+  addMessage(message, "user");
+  input.value = "";
+  sendBtn.disabled = true;
+  statusText.textContent = "AI जवाब तैयार कर रहा है...";
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: message
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "सर्वर में समस्या है");
+    }
+
+    const reply = data.reply || "जवाब प्राप्त नहीं हुआ।";
+    addMessage(reply, "bot");
+    speakText(reply);
+
+    statusText.textContent = "AI तैयार है";
+
+  } catch (error) {
+    addMessage("माफ कीजिए, सर्वर से जवाब नहीं मिला। " +
+      error.message, "bot");
+    statusText.textContent = "कनेक्शन जाँचें";
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+
+sendBtn.addEventListener("click", sendMessage);
+
+input.addEventListener("keydown", function(event) {
+  if (event.key === "Enter") {
+    sendMessage();
+  }
+});
+
+const Speech =
+  window.SpeechRecognition ||
+  window.webkitSpeechRecognition;
+
+if (Speech) {
+  const recognition = new Speech();
+  recognition.lang = "hi-IN";
+  recognition.interimResults = false;
+
+  micBtn.addEventListener("click", function() {
+    recognition.start();
+    statusText.textContent = "आप बोलिए...";
+  });
+
+  recognition.onresult = function(event) {
+    input.value = event.results[0][0].transcript;
+    statusText.textContent = "आवाज प्राप्त हुई";
+    sendMessage();
+  };
+
+  recognition.onerror = function() {
+    statusText.textContent = "माइक की अनुमति जाँचें";
+  };
+
+  recognition.onend = function() {
+    if (statusText.textContent === "आप बोलिए...") {
+      statusText.textContent = "AI तैयार है";
+    }
+  };
+} else {
+  micBtn.disabled = true;
+  statusText.textContent = "इस ब्राउजर में Voice Recognition उपलब्ध नहीं है";
+}
+</script>
+
+</body>
+</html>
 
